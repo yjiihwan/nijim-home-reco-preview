@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>니짐내짐 홈 추천 영역 · 체험권 + 구독 + 1일권 + 새로 들어온 센터 칸 (참조 구현)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;overscroll-behavior-x:none}
+body{font-family:Pretendard,'Apple SD Gothic Neo',sans-serif;background:#fff;color:#202024;-webkit-font-smoothing:antialiased}
+.app{position:relative;max-width:390px;margin:0 auto;overflow-x:hidden}
+img.cap{display:block;width:100%}
+.fixhead{position:fixed;left:50%;transform:translateX(-50%);top:0;width:100%;max-width:390px;z-index:5;display:none}
+.fixhead.on{display:block}
+.tab{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;width:355.6px;z-index:6;filter:drop-shadow(0 2px 8px rgba(0,0,0,.06))}
+.gap{height:8px;background:#F5F5F5}
+.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tail{height:120px}
+
+.sec{background:#fff;padding:28px 0 30px}
+.sec .hd{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:0 15px}
+.sec .hd>div{min-width:0}
+.sec h2{font-size:20px;font-weight:700;letter-spacing:-.4px;color:#111114;line-height:1.3}
+.sec .sub{font-size:13px;color:#8A8A93;margin-top:3px;letter-spacing:-.2px}
+.chev{width:6px;height:6px;border-right:1.5px solid #9A9AA2;border-top:1.5px solid #9A9AA2;transform:rotate(45deg);margin-left:3px}
+
+.rail{display:flex;gap:10px;padding:16px 15px 0;overflow-x:auto;overflow-y:hidden;
+  scroll-snap-type:x mandatory;scroll-padding:0 15px;overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;touch-action:pan-x pan-y}
+.rail::-webkit-scrollbar{display:none}
+.ca{flex:none;width:300px;scroll-snap-align:start;min-width:0;color:inherit;text-decoration:none}
+.ca .ph{height:200px}
+.ca .bd{padding:12px 2px 0}
+.ca .bf{margin-top:8px}
+.ca .nr{display:flex;align-items:flex-start;gap:6px}
+.ca .nr .nm{flex:1;min-width:0}
+.ca .go{flex:none;width:8px;height:8px;border-right:2px solid #A3A3AB;border-top:2px solid #A3A3AB;transform:rotate(45deg);margin:7.5px 4px 0 0}
+.nm2{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
+.ca{-webkit-tap-highlight-color:transparent;cursor:pointer}
+.ca:active .ph{filter:brightness(.92)}
+.ca:active .bd{opacity:.7}
+.solo .ca{width:100%}
+.solo .ca .ph{height:220px}
+.solo.rail{overflow:hidden}
+
+.ph{position:relative;border-radius:12px;background:#E9E9EC center/cover no-repeat;overflow:hidden}
+.ph.none{background:#F2F2F4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.ph.none img{width:46px;opacity:.13}
+.ph.none span{font-size:12px;color:#A3A3AB}
+.due{position:absolute;left:10px;top:10px;font-size:12px;font-weight:700;color:#fff;background:rgba(17,17,20,.62);border-radius:6px;padding:4px 8px;letter-spacing:-.2px}
+.due.hot{background:#FF0065}
+.ph.none .due{background:#8A8A93}.ph.none .due.hot{background:#FF0065}
+.nm{font-size:17px;font-weight:700;letter-spacing:-.4px;color:#202024;line-height:1.35}
+.mt{font-size:13px;color:#6B6B73;margin-top:2px;letter-spacing:-.2px}
+.bf{font-size:21px;font-weight:800;color:#FF0065;letter-spacing:-.5px;line-height:1.3}
+
+.moreCard{flex:none;width:140px;height:200px;border-radius:12px;background:#F5F5F7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-size:14px;color:#46464E;font-weight:600;text-align:center;line-height:1.4;scroll-snap-align:end;text-decoration:none}
+.moreCard i{width:40px;height:40px;border-radius:20px;background:#fff;display:flex;align-items:center;justify-content:center}
+.dots{display:flex;justify-content:center;gap:5px;margin-top:16px}
+.dots s{width:5px;height:5px;border-radius:3px;background:#DADADF;transition:width .15s}
+.dots s.on{width:14px;background:#202024}
+
+/* 구독 칸: 카드 틀은 체험권과 같음. 사진 위 칩 2개(구독·이용횟수) + 혜택 자리에 월 가격 */
+.chips{position:absolute;left:10px;top:10px;display:flex;gap:4px}
+.chip{font-size:12px;font-weight:700;color:#fff;border-radius:6px;padding:4px 8px;letter-spacing:-.2px;white-space:nowrap}
+.chip.g{background:#0B8457;display:flex;align-items:center;gap:4px}
+.chip.k{background:rgba(17,17,20,.62)}
+.ph.none .chip.k{background:#6B6B73}
+.inf{width:14px;height:8px;position:relative;display:inline-block}
+.inf:before,.inf:after{content:'';position:absolute;top:0;width:6px;height:6px;border:1.5px solid #fff;border-radius:50%}
+.inf:before{left:0}.inf:after{right:0}
+.pr{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;margin-top:8px;min-width:0}
+.pr .won{flex:none;font-size:21px;font-weight:800;color:#202024;letter-spacing:-.5px;line-height:1.3}
+.pr .won small{font-size:15px;font-weight:700;margin-left:1px}
+.pr .won em{font-style:normal;font-size:15px;font-weight:700;margin-right:3px}
+.pr .bs{flex:none;font-size:12px;white-space:nowrap;color:#8A8A93;letter-spacing:-.2px}
+/* «사진 준비 중» 회색 글자(.ph.none span)가 칩 글자까지 덮지 않게 — 10-19 구독 «하루 2회» 흐림 수정 */
+.ph.none .chip{color:#fff}
+
+/* 1일권 칸: 카드 틀은 같음. 사진 위 칩 1개(«1일권», 니짐 Indigo #253DBE) + 아래 줄에 1일권 가격 */
+.chip.o{background:#253DBE;display:flex;align-items:center;gap:4px}
+.tk{width:12px;height:9px;border:1.5px solid #fff;border-radius:2px;position:relative;display:inline-block}
+.tk:after{content:'';position:absolute;left:3px;top:-1.5px;bottom:-1.5px;border-left:1.5px dashed #fff}
+
+/* 새로 들어온 센터 칸(10-20): 카드 틀은 같음. 사진 위 «NEW» 칩 1개. 아래 줄(입점 표기·가격·버튼) 없음
+   칩 = 밝은 노랑 #FFD60A + 잉크 글자(10-20 형 «검정 칙칙» 시정. 노랑 위 흰 글자는 대비 부족) */
+.chip.n{background:#FFD60A;color:#16161C;letter-spacing:.4px}
+.ph.none .chip.n{color:#16161C}
+</style></head>
+<body>
+<div class="app" id="app">
+  <img class="cap" src="assets/top.png" alt="">
+  <div id="reco"></div>
+  <div class="tail"></div>
+</div>
+<img class="fixhead" id="fixhead" src="assets/header.png" alt="">
+<img class="tab" id="tab" src="assets/tabbar.png" alt="">
+<script src="homeReco.js"></script>
+<script src="sampleData.js"></script>
+<script src="adminMock.js"></script>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var today = q.get('today') || '2026-10-19';
+  var trial = HomeReco.trialSection(SAMPLE.trial[q.get('t') || 'n12'] || [], today);
+  var subs = HomeReco.subsSection(SAMPLE.subs[q.get('s') || 'n12'] || []);
+  var oneday = HomeReco.onedaySection(SAMPLE.oneday[q.get('o') || 'n10'] || []);
+  // 새 칸: 노출 일수·센터 온라인광고 ON/첫 시작일은 관리자 값(프로토타입은 adminMock.js, 앱은 서버 응답)
+  var newDays = AdminMock.newDays(q);
+  var newc = HomeReco.newSection(AdminMock.applyCenters(SAMPLE.newc[q.get('n') || 'n10'] || []), today, newDays);
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function photo(c, badges) {
+    if (!c.photo) return '<div class="ph none"><img src="assets/nijim_symbol_black.svg" alt=""><span>사진 준비 중</span>' + badges + '</div>';
+    return '<div class="ph" style="background-image:url(\'' + encodeURI(c.photo) + '\')">' + badges + '</div>';
+  }
+  function trialBadges(c) { return c.chip ? '<span class="due' + (c.chip.hot ? ' hot' : '') + '">' + esc(c.chip.text) + '</span>' : ''; }
+  function subsBadges(c) {
+    return '<div class="chips"><span class="chip g"><i class="inf" aria-hidden="true"></i>구독</span>' + (c.usage ? '<span class="chip k">' + esc(c.usage) + '</span>' : '') + '</div>';
+  }
+  function trialFoot(c) { return '<div class="bf ell">' + esc(c.benefit) + '</div>'; }
+  function subsFoot(c) {
+    return '<div class="pr"><div class="won"><em>월</em>' + esc(c.price) + '<small>' + (c.from ? '원부터' : '원') + '</small></div>' +
+      (c.basis ? '<div class="bs">' + esc(c.basis) + '</div>' : '') + '</div>';
+  }
+  function onedayBadges() { return '<div class="chips"><span class="chip o"><i class="tk" aria-hidden="true"></i>1일권</span></div>'; }
+  function onedayFoot(c) { return '<div class="pr"><div class="won"><em>1일권</em>' + esc(c.price) + '<small>' + (c.from ? '원부터' : '원') + '</small></div></div>'; }
+
+  function newBadges() { return '<div class="chips"><span class="chip n">NEW</span></div>'; }
+  // 10-20 형 시정: «n일 전 입점» 줄 삭제 — 카드 아래는 센터명·지역·거리까지만
+  function newFoot() { return ''; }
+
+  // «더보기» → 칸별 전용 목록 화면(list.html, 10-20). 예전 단어 검색결과 화면(#nearby?filter=…) 이동은 없앰
+  function listHref(k, d) {
+    return 'list.html?k=' + k + '&d=' + encodeURIComponent(d) + '&today=' + encodeURIComponent(today) + (q.get('days') ? '&days=' + encodeURIComponent(q.get('days')) : '') + '&from=' + encodeURIComponent(location.search.slice(1));
+  }
+  var KINDS = {
+    trial: { title: '지금 체험권 이벤트 중인 센터', sub: '부담 없이 먼저 운동해 보고 정하세요', all: listHref('trial', q.get('t') || 'n12'), badges: trialBadges, foot: trialFoot },
+    subs: { title: '헬스장도 넷플릭스처럼 구독!', sub: '월 단위로 가볍게 시작해요', all: listHref('subs', q.get('s') || 'n12'), badges: subsBadges, foot: subsFoot },
+    oneday: { title: '1일권 판매 중인 센터', sub: '필요한 날 하루만 이용해요', all: listHref('oneday', q.get('o') || 'n10'), badges: onedayBadges, foot: onedayFoot },
+    newc: { title: '새로 들어온 센터', sub: '최근 니짐내짐에 입점했어요', all: listHref('new', q.get('n') || 'n10'), badges: newBadges, foot: newFoot }
+  };
+
+  // 카드 전체가 하나의 링크 → 센터 소개 페이지
+  function card(k, c) {
+    return '<a class="ca" href="#center-' + esc(c.centerId) + '" data-center="' + esc(c.centerId) + '" aria-label="' + esc(c.centerName + ' 센터 소개 보기') + '">' + photo(c, k.badges(c)) +
+      '<div class="bd"><div class="nr"><div class="nm nm2">' + esc(c.centerName) + '</div><i class="go" aria-hidden="true"></i></div>' +
+      '<div class="mt ell">' + esc(c.meta) + '</div>' + k.foot(c) + '</div></a>';
+  }
+  function section(id, s) {
+    var k = KINDS[id];
+    var head = '<div class="hd"><div><h2>' + k.title + '</h2><div class="sub">' + k.sub + '</div></div></div>';
+    var rail = '<div class="rail' + (s.mode === 'solo' ? ' solo' : '') + '">' + s.cards.map(function (c) { return card(k, c); }).join('') +
+      (s.showAll ? '<a class="moreCard" href="' + esc(k.all) + '"><i><span class="chev" style="margin:0 3px 0 0"></span></i>더보기</a>' : '') + '</div>';
+    var dots = s.dots > 1 ? '<div class="dots">' + Array.from({ length: s.dots }, function (_, i) { return '<s' + (i === 0 ? ' class="on"' : '') + '></s>'; }).join('') + '</div>' : '';
+    return '<section class="sec" id="' + id + '">' + head + rail + dots + '</section>';
+  }
+
+  // 센터 0곳인 칸은 제목·카드·구분 띠까지 통째로 없음. 회색 띠는 «보이는 칸 사이»에만
+  var shown = [['trial', trial], ['subs', subs], ['oneday', oneday], ['newc', newc]].filter(function (x) { return x[1].mode !== 'hidden'; });
+  var slot = document.getElementById('reco');
+  if (shown.length) slot.outerHTML = shown.map(function (x) { return section(x[0], x[1]); }).join('<div class="gap"></div>');
+  else slot.remove();
+
+  Array.prototype.forEach.call(document.querySelectorAll('.sec'), function (sec) {
+    var r = sec.querySelector('.rail'), d = sec.querySelector('.dots');
+    if (!d) return;
+    var ds = d.children;
+    r.addEventListener('scroll', function () {
+      var max = r.scrollWidth - r.clientWidth;
+      // 끝(«더보기» 카드 포함)에 닿으면 마지막 점
+      var i = r.scrollLeft >= max - 2 ? ds.length - 1 : Math.min(ds.length - 1, Math.round(r.scrollLeft / 310));
+      for (var n = 0; n < ds.length; n++) ds[n].className = n === i ? 'on' : '';
+    }, { passive: true });
+  });
+
+  // 목록에서 ‹ 뒤로 오면 그 칸의 넘김 위치(끝카드가 보이는 상태)와 세로 위치 그대로
+  var KEY = 'nijimHomeReco:' + location.search;
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.moreCard')) return;
+    var rails = {};
+    Array.prototype.forEach.call(document.querySelectorAll('.sec'), function (sec) { rails[sec.id] = sec.querySelector('.rail').scrollLeft; });
+    try { sessionStorage.setItem(KEY, JSON.stringify({ y: window.scrollY, rails: rails })); } catch (err) {}
+  });
+  function restore() {
+    var v;
+    try { v = JSON.parse(sessionStorage.getItem(KEY) || 'null'); sessionStorage.removeItem(KEY); } catch (err) { v = null; }
+    if (!v) return;
+    Object.keys(v.rails).forEach(function (id) {
+      var r = document.querySelector('#' + id + ' .rail');
+      if (r) { r.scrollLeft = v.rails[id]; r.dispatchEvent(new Event('scroll')); }
+    });
+    window.scrollTo(0, v.y);
+  }
+  // 위쪽 캡처 이미지가 다 불러와진 뒤에 세로 위치를 맞춰야 잘리지 않음
+  if (document.readyState === 'complete') restore(); else window.addEventListener('load', restore);
+  window.addEventListener('pageshow', function (e) { if (e.persisted) restore(); });
+
+  var fh = document.getElementById('fixhead');
+  window.addEventListener('scroll', function () { fh.classList.toggle('on', window.scrollY > 0); }, { passive: true });
+  window.__reco = { trial: trial, subs: subs, oneday: oneday, newc: newc, newDays: newDays };
+})();
+</script>
+</body></html>

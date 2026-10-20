@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>니짐내짐 홈 추천칸 «더보기» 목록 화면 (참조 구현)</title>
+<!--
+  홈 추천칸 끝카드 «더보기» → 이 화면. 네 칸이 같은 틀을 쓴다(?k=trial|subs|oneday|new).
+  목록 = homeReco.js listPage(): 홈 칸과 같은 규칙·같은 가까운 순, 20곳씩 이어 불러오기. AD 없음.
+  카드 = 현행 검색결과 카드 상단(센터명·♥·거리·태그·사진 3분할) 그대로 + 사진 아래 칩 줄·상품 줄.
+  형 확인 대기 3건(정렬 버튼·센터 수·이벤트 줄)은 HomeReco.LIST_OPTIONS 로 켜고 끈다(기본 전부 끔).
+  주소: ?k=trial&d=n12 (d = sampleData 묶음, 홈의 t/s/o 값과 같음) · &empty=1 빈 상태 · &sortBtn=1 &count=1 &event=1 확인 대기 항목 미리보기
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+/* html에만: body까지 hidden이면 body가 스크롤 틀이 되어 머리 sticky가 안 붙는다 */
+html{overflow-x:hidden;overscroll-behavior-x:none}
+body{font-family:Pretendard,'Apple SD Gothic Neo',sans-serif;background:#F6F6F8;color:#202024;-webkit-font-smoothing:antialiased;letter-spacing:-.2px}
+.app{position:relative;max-width:430px;margin:0 auto;background:#F6F6F8;min-height:100vh}
+.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 머리: 현행 앱 하위 화면 머리(«내 쿠폰함»과 같음). 머리+정렬 안내 줄은 위에 붙어 있음 */
+.top{position:sticky;top:0;z-index:3;background:#fff}
+.nav{height:52px;position:relative;display:flex;align-items:center;justify-content:center;padding:0 52px}
+.nav .back{position:absolute;left:10px;top:6px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:none;border:0;cursor:pointer}
+.nav h1{font-size:18px;font-weight:700;letter-spacing:-.4px;color:#111114;min-width:0}
+.sortinfo{height:40px;display:flex;align-items:center;gap:5px;padding:0 16px;font-size:13px;font-weight:500;color:#6B6B73;border-bottom:1px solid #ECECEF}
+.sortinfo .cnt{margin-left:auto;color:#8A8A93}
+.sortinfo button{font:inherit;color:#202024;font-weight:600;background:none;border:0;display:inline-flex;align-items:center;gap:3px;cursor:pointer;padding:0}
+.sortinfo button:after{content:'';width:5px;height:5px;border:solid #6B6B73;border-width:0 1.5px 1.5px 0;transform:rotate(45deg) translateY(-2px);margin-left:3px}
+
+/* 카드 — 현행 검색결과 카드 값 */
+.card{display:block;background:#fff;padding:18px 16px;margin-bottom:8px;color:inherit;text-decoration:none;-webkit-tap-highlight-color:transparent;cursor:pointer}
+.card:active .photos{filter:brightness(.92)}
+.card:active .tx{opacity:.7}
+.name{font-size:19px;font-weight:700;letter-spacing:-.4px;line-height:24px}
+.meta{margin-top:6px;display:flex;align-items:center;gap:6px;font-size:14px;color:#6B6B73;font-weight:500;line-height:18px}
+.meta .heart{color:#FC2066;display:inline-flex;align-items:center;gap:3px}
+.meta .dot{color:#C7C7CC}
+.meta .dist{display:inline-flex;align-items:center;gap:3px}
+.tags{display:flex;gap:6px;margin-top:10px;overflow:hidden}
+.tag{flex:none;height:24px;padding:0 9px;border-radius:6px;background:#FFF0F5;color:#D4004E;font-size:12px;font-weight:600;display:inline-flex;align-items:center;letter-spacing:0}
+.photos{display:grid;grid-template-columns:repeat(var(--n,3),1fr);gap:4px;height:164px;margin-top:14px;border-radius:10px;overflow:hidden}
+.photos .p{background:#E9E9EC center/cover no-repeat}
+.photos.none{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#F2F2F4}
+.photos.none img{width:46px;opacity:.13}
+.photos.none span{font-size:12px;color:#A3A3AB}
+
+/* ① 칩 줄 — 홈 추천칸 A안 칩 규격, 사진 아래 줄 */
+.chips{display:flex;gap:4px;margin-top:12px;height:22px;align-items:center}
+.chip{font-size:12px;font-weight:700;color:#fff;border-radius:6px;padding:4px 8px;letter-spacing:-.2px;white-space:nowrap;line-height:14px;display:inline-flex;align-items:center;gap:4px}
+.chip.hot{background:#FF0065}
+.chip.k{background:#6B6B73}
+.chip.g{background:#0B8457}
+.chip.o{background:#253DBE}
+.chip.n{background:#FFD60A;color:#16161C;letter-spacing:.4px}
+/* 새로 들어온 센터: 칩 줄 = NEW 칩만(10-20 입점 표기 삭제). 상품 줄 없음 */
+.inf{width:14px;height:8px;position:relative;display:inline-block}
+.inf:before,.inf:after{content:'';position:absolute;top:0;width:6px;height:6px;border:1.5px solid #fff;border-radius:50%}
+.inf:before{left:0}.inf:after{right:0}
+.tk{width:12px;height:9px;border:1.5px solid #fff;border-radius:2px;position:relative;display:inline-block}
+.tk:after{content:'';position:absolute;left:3px;top:-1.5px;bottom:-1.5px;border-left:1.5px dashed #fff}
+
+/* ② 상품 줄 — 홈 추천칸 A안 아래 줄 */
+.prod{margin-top:8px;min-width:0}
+.photos+.prod{margin-top:12px}
+.bf{font-size:21px;font-weight:800;color:#FF0065;letter-spacing:-.5px;line-height:1.3}
+.pr{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px}
+.won{flex:none;font-size:21px;font-weight:800;color:#202024;letter-spacing:-.5px;line-height:1.3}
+.won small{font-size:15px;font-weight:700;margin-left:1px}
+.won em{font-style:normal;font-size:15px;font-weight:700;margin-right:3px}
+.bs{flex:none;font-size:12px;white-space:nowrap;color:#8A8A93;letter-spacing:-.2px}
+/* 이벤트 줄(확인 대기 · 기본 꺼짐) — 현행 검색 카드 이벤트 줄 */
+.ev{margin-top:10px;display:flex;align-items:center;gap:6px;font-size:13px;color:#6B6B73;min-width:0}
+.ev b{flex:none;height:20px;padding:0 6px;border-radius:4px;background:#FFF0F5;color:#D4004E;font-size:11px;font-weight:700;display:inline-flex;align-items:center}
+
+.empty{background:#fff;padding:230px 24px 0;text-align:center;min-height:calc(100vh - 92px)}
+.empty img{width:52px;opacity:.13}
+.empty b{display:block;margin-top:16px;font-size:17px;font-weight:700;color:#202024;letter-spacing:-.4px}
+.empty p{margin-top:6px;font-size:14px;color:#8A8A93}
+.tail{height:26px}
+/* 로딩 표시 자리 — 앱은 기존 로딩 표시를 쓴다 */
+.more{height:56px;display:flex;align-items:center;justify-content:center}
+.more i{width:22px;height:22px;border:2.5px solid #E1E1E6;border-top-color:#FF0065;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style></head>
+<body>
+<div class="app" id="app"></div>
+<script src="homeReco.js"></script>
+<script src="sampleData.js"></script>
+<script src="adminMock.js"></script>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var K = { trial: 'trial', subs: 'subs', oneday: 'oneday', 'new': 'new' }[q.get('k')] || 'trial';
+  var today = q.get('today') || '2026-10-19';
+  var DEF = { trial: 'n12', subs: 'n12', oneday: 'n10', 'new': 'n10' };
+  var DATA = { trial: SAMPLE.trial, subs: SAMPLE.subs, oneday: SAMPLE.oneday, 'new': SAMPLE.newc };
+  var input = q.get('empty') ? [] : (DATA[K][q.get('d') || DEF[K]] || []);
+  if (K === 'new') input = AdminMock.applyCenters(input);
+  var opt = { newDays: AdminMock.newDays(q) };
+  var O = {};
+  for (var key in HomeReco.LIST_OPTIONS) O[key] = HomeReco.LIST_OPTIONS[key];
+  if (q.get('sortBtn')) O.sortButton = q.get('sortBtn') === '1';
+  if (q.get('count')) O.showCount = q.get('count') === '1';
+  if (q.get('event')) O.eventRow = q.get('event') === '1';
+
+  var TITLE = { trial: '지금 체험권 이벤트 중인 센터', subs: '헬스장도 넷플릭스처럼 구독!', oneday: '1일권 판매 중인 센터', 'new': '새로 들어온 센터' };
+  var HEART = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#FC2066" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.1C.9 8.4 3 5 6.4 5c2 0 3.4 1.1 4.1 2.2h3C14.2 6.1 15.6 5 17.6 5 21 5 23.1 8.4 21.6 11.9 19.5 16.4 12 21 12 21z"/></svg>';
+  var DIST = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B6B73" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>';
+  var BACK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#202024" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+  var PIN = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6B6B73" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0113 0c0 4.9-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>';
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function hearts(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+  function chips(c) {
+    if (K === 'trial') return c.chip ? '<div class="chips"><span class="chip ' + (c.chip.hot ? 'hot' : 'k') + '">' + esc(c.chip.text) + '</span></div>' : '';
+    if (K === 'subs') return '<div class="chips"><span class="chip g"><i class="inf" aria-hidden="true"></i>구독</span>' + (c.usage ? '<span class="chip k">' + esc(c.usage) + '</span>' : '') + '</div>';
+    if (K === 'new') return '<div class="chips"><span class="chip n">NEW</span></div>';
+    return '<div class="chips"><span class="chip o"><i class="tk" aria-hidden="true"></i>1일권</span></div>';
+  }
+  function prod(c) {
+    var u = c.from ? '원부터' : '원';
+    if (K === 'new') return '';
+    if (K === 'trial') return '<div class="prod tx"><div class="bf ell">' + esc(c.benefit) + '</div></div>';
+    if (K === 'subs') return '<div class="prod tx pr"><div class="won"><em>월</em>' + esc(c.price) + '<small>' + u + '</small></div>' + (c.basis ? '<div class="bs">' + esc(c.basis) + '</div>' : '') + '</div>';
+    return '<div class="prod tx pr"><div class="won"><em>1일권</em>' + esc(c.price) + '<small>' + u + '</small></div></div>';
+  }
+  // 사진 1~2장 센터: 앱은 현행 검색 카드 처리 그대로. 여기서는 있는 장수만큼 나눠 보여 줄 뿐(새 규칙 아님)
+  function photos(info) {
+    var ps = (info.photos || []).slice(0, 3);
+    if (!ps.length) return '<div class="photos none"><img src="assets/nijim_symbol_black.svg" alt=""><span>사진 준비 중</span></div>';
+    return '<div class="photos" style="--n:' + ps.length + '">' + ps.map(function (s) { return '<div class="p" style="background-image:url(\'' + encodeURI(s) + '\')"></div>'; }).join('') + '</div>';
+  }
+  function card(c) {
+    var info = cardInfo(c), d = c.distance;
+    return '<a class="card" href="#center-' + esc(c.centerId) + '" data-center="' + esc(c.centerId) + '" aria-label="' + esc(c.centerName + ' 센터 소개 보기') + '">' +
+      '<div class="tx"><div class="name ell">' + esc(c.centerName) + '</div>' +
+      '<div class="meta"><span class="heart">' + HEART + hearts(info.hearts) + '</span>' + (d ? '<span class="dot">·</span><span class="dist">' + DIST + esc(d) + '</span>' : '') + '</div>' +
+      '<div class="tags">' + (info.tags || []).map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') + '</div></div>' +
+      photos(info) + chips(c) + prod(c) +
+      (O.eventRow && info.event ? '<div class="ev tx"><b>이벤트</b><span class="ell">' + esc(info.event) + '</span></div>' : '') + '</a>';
+  }
+
+  // 인기순은 확인 대기 항목(정렬 버튼)을 켰을 때만. 실제 앱에선 서버가 정렬해서 페이지로 준다
+  var order = 'near';
+  function pageOf(p) {
+    if (order === 'near') return HomeReco.listPage(K, input, today, p, null, opt);
+    var all = HomeReco.listRanked(K, input, today, opt).slice().sort(function (a, b) { return cardInfo(b).hearts - cardInfo(a).hearts; });
+    var n = HomeReco.LIST_PAGE_SIZE;
+    return { page: p, items: all.slice(p * n, p * n + n), hasMore: p * n + n < all.length, total: all.length };
+  }
+
+  var app = document.getElementById('app');
+  var first = pageOf(0);
+  var sortLabel = { near: '내 위치에서 가까운 순', pop: '인기 많은 순' };
+  function sortLine() {
+    return PIN + (O.sortButton ? '<button type="button" id="sortBtn">' + sortLabel[order] + '</button>' : '<span>' + sortLabel.near + '</span>') +
+      (O.showCount ? '<span class="cnt">' + first.total + '곳</span>' : '');
+  }
+  app.innerHTML = '<div class="top"><div class="nav"><button class="back" id="back" type="button" aria-label="뒤로">' + BACK + '</button><h1 class="ell">' + TITLE[K] + '</h1></div>' +
+    '<div class="sortinfo" id="sortinfo">' + sortLine() + '</div></div><div id="list"></div>';
+  var list = document.getElementById('list');
+
+  var page = 0, busy = false, io = null;
+  function render(res, append) {
+    if (!append) {
+      if (!res.items.length) {
+        list.innerHTML = '<div class="empty"><img src="assets/nijim_symbol_black.svg" alt=""><b>지금은 보여드릴 센터가 없어요</b><p>홈에서 다른 센터를 둘러보세요</p></div>';
+        return;
+      }
+      list.innerHTML = '<div id="cards"></div><div id="foot"></div>';
+    }
+    document.getElementById('cards').insertAdjacentHTML('beforeend', res.items.map(card).join(''));
+    var foot = document.getElementById('foot');
+    foot.innerHTML = res.hasMore ? '<div class="more" id="sentinel" aria-label="불러오는 중"><i></i></div>' : '<div class="tail"></div>';
+    if (res.hasMore) watch();
+  }
+  function watch() {
+    if (io) io.disconnect();
+    io = new IntersectionObserver(function (es) {
+      if (!es[0].isIntersecting || busy) return;
+      busy = true;
+      setTimeout(function () { page += 1; busy = false; render(pageOf(page), true); }, 250);
+    }, { rootMargin: '0px 0px 600px 0px' });
+    io.observe(document.getElementById('sentinel'));
+  }
+  render(first, false);
+
+  if (O.sortButton) {
+    document.getElementById('sortinfo').addEventListener('click', function (e) {
+      if (!e.target.closest('#sortBtn')) return;
+      order = order === 'near' ? 'pop' : 'near';
+      page = 0;
+      document.getElementById('sortinfo').innerHTML = sortLine();
+      render(pageOf(0), false);
+      window.scrollTo(0, 0);
+    });
+  }
+
+  // ‹ 뒤로 → 홈. 홈은 떠나기 전 넘김 위치를 저장해 두고 돌아오면 복원한다(home.html)
+  document.getElementById('back').addEventListener('click', function () {
+    if (document.referrer && /home\.html/.test(document.referrer) && history.length > 1) history.back();
+    else location.href = 'home.html' + (q.get('from') ? '?' + q.get('from') : '');
+  });
+
+  window.__list = { kind: K, options: O, first: first, page: function () { return page; } };
+})();
+</script>
+</body></html>

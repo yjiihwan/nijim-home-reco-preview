@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>니짐내짐 관리자 · 홈 추천 «새로 들어온 센터» 설정 (참조 구현)</title>
+<!--
+  관리자 화면 참조 구현(프로토타입). 실제 관리자 웹은 외부개발사 코드 — 이 화면은 «어떤 칸이 필요한가»를 보여 주는 용도.
+  ① 노출 일수 N(기본 30, 1~365) 저장 ② 센터별 온라인광고 ON/OFF·온라인광고 시작일(= 첫 ON 일자, 처음 켤 때 자동 기록·다시 켜도 안 바뀜) 확인·정정.
+  저장값은 adminMock.js(localStorage)로 home.html·list.html에 바로 반영된다. 주소 ?today=2026-10-19 (기준일)
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Pretendard,'Apple SD Gothic Neo',sans-serif;background:#F4F5F7;color:#202024;-webkit-font-smoothing:antialiased;letter-spacing:-.2px;font-size:14px}
+.top{height:56px;background:#16161C;color:#fff;display:flex;align-items:center;padding:0 28px;gap:10px;font-weight:700}
+.top small{font-weight:500;color:#A3A3AB;font-size:13px}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 24px 60px}
+.crumb{font-size:13px;color:#8A8A93;margin-bottom:6px}
+h1{font-size:22px;font-weight:700;letter-spacing:-.4px;margin-bottom:20px}
+.box{background:#fff;border:1px solid #E6E6EA;border-radius:12px;padding:22px 24px;margin-bottom:18px}
+.box h2{font-size:16px;font-weight:700;margin-bottom:4px}
+.box .desc{color:#6B6B73;font-size:13px;line-height:1.5;margin-bottom:16px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.row label{font-weight:600}
+input[type=number]{width:90px;height:40px;border:1px solid #CFCFD6;border-radius:8px;padding:0 12px;font:inherit;font-size:16px;font-weight:700;text-align:right}
+input[type=date]{height:34px;border:1px solid #CFCFD6;border-radius:6px;padding:0 8px;font:inherit}
+input:focus{outline:2px solid #FF0065;outline-offset:-1px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid #CFCFD6;background:#fff;height:34px;padding:0 12px;font-weight:600}
+button.pri{background:#FF0065;border-color:#FF0065;color:#fff;height:40px;padding:0 18px}
+.hint{color:#8A8A93;font-size:13px}
+.err{color:#D11A2A;font-size:13px;font-weight:600}
+.ok{color:#0B8457;font-size:13px;font-weight:600}
+.sum{margin-top:14px;padding:12px 14px;background:#F7F7F9;border-radius:8px;font-size:13px;color:#46464E;line-height:1.6}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#F7F7F9;color:#6B6B73;font-weight:600;text-align:left;padding:10px 12px;border-bottom:1px solid #E6E6EA}
+td{padding:10px 12px;border-bottom:1px solid #F0F0F3;vertical-align:middle}
+td.nm{font-weight:600;max-width:320px}
+.st{display:inline-block;padding:3px 8px;border-radius:6px;font-weight:700;font-size:12px}
+.st.on{background:#E7F6EF;color:#0B8457}
+.st.off{background:#EDEDF0;color:#6B6B73}
+.st.wait{background:#FFF1F6;color:#C2004D}
+.pub{color:#0B8457;font-weight:600}.hid{color:#8A8A93}.mgr{color:#6B6B73}
+.links{display:flex;gap:14px;margin-top:6px}
+.links a{color:#253DBE;font-weight:600;font-size:13px}
+</style></head>
+<body>
+<div class="top">니짐내짐 관리자 <small>최고관리자</small></div>
+<div class="wrap">
+  <div class="crumb">앱 관리 › 홈 추천 영역</div>
+  <h1>«새로 들어온 센터» 칸 설정</h1>
+
+  <div class="box" id="daysBox">
+    <h2>노출 기간</h2>
+    <div class="desc">온라인광고를 진행 중인 센터만, 온라인광고 시작일(처음 켠 날)부터 아래 기간 동안 앱 홈 추천탭 «새로 들어온 센터» 칸에 자동으로 보입니다. 기간이 끝나면 다음 날 자동으로 빠지고, 광고를 끄면 기간 안이어도 바로 빠집니다. 시작일 당일이 1일째입니다. 센터관리 기능만 쓰는 센터는 대상이 아닙니다.</div>
+    <div class="row">
+      <label for="days">온라인광고 시작일부터</label>
+      <input type="number" id="days" min="1" max="365" step="1" inputmode="numeric">
+      <span>일 동안 노출</span>
+      <button class="pri" id="save" type="button">저장</button>
+      <span class="hint">1~365일 · 기본 30일</span>
+      <span id="msg" role="status"></span>
+    </div>
+    <div class="sum" id="sum"></div>
+  </div>
+
+  <div class="box">
+    <h2>센터 온라인광고 시작일</h2>
+    <div class="desc">온라인광고 시작일은 센터의 온라인광고(앱 노출)를 <b>처음 켤 때</b> 그날 날짜로 자동 기록됩니다. 광고를 껐다가 다시 켜도 시작일은 바뀌지 않고, 다시 켠 센터는 «새로 들어온 센터»로 치지 않습니다. 잘못 기록된 경우에만 고쳐 주세요.</div>
+    <table><thead><tr><th>센터</th><th>온라인광고</th><th>온라인광고 시작일</th><th>«새로 들어온 센터» 칸</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+    <div class="links"><a href="home.html" id="toHome">앱 홈에서 보기 ›</a><a href="#" id="reset">시연 값 처음으로</a></div>
+  </div>
+</div>
+<script src="homeReco.js"></script>
+<script src="sampleData.js"></script>
+<script src="adminMock.js"></script>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var today = q.get('today') || '2026-10-19';
+  var base = SAMPLE.newc[q.get('d') || 'n10'] || SAMPLE.newc.n10;
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function md(s) { var p = s.split('-'); return Number(p[1]) + '.' + Number(p[2]); }
+  function addDays(s, n) { var d = new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10) + n)); return d.toISOString().slice(0, 10); }
+
+  function state(c, n) {
+    if (!c.adOn && !c.adStartDate) return { cls: 'wait', text: '센터관리만 사용 · 대상 아님' };
+    if (!c.adOn) return { cls: 'off', text: '광고 꺼짐 · 안 보임' };
+    if (!c.adStartDate) return { cls: 'off', text: '시작일 없음 · 안 보임' };
+    var d = HomeReco.daysSince(c.adStartDate, today);
+    if (d < 0) return { cls: 'off', text: '시작 예정 · ' + md(c.adStartDate) + '부터' };
+    if (d >= n) return { cls: 'off', text: '기간 끝 · ' + md(addDays(c.adStartDate, n)) + ' 빠짐' };
+    return { cls: 'on', text: '노출 중 · ' + (d + 1) + '일째 (' + md(addDays(c.adStartDate, n - 1)) + '까지)' };
+  }
+
+  function adCell(c) {
+    if (c.adOn) return '<span class="pub">진행 중</span>';
+    return c.adStartDate ? '<span class="hid">꺼짐</span>' : '<span class="mgr">미진행 (센터관리만)</span>';
+  }
+
+  function render() {
+    var n = AdminMock.newDays(null), list = AdminMock.applyCenters(base);
+    $('days').value = n;
+    var on = list.filter(function (c) { return HomeReco.isNew(c, today, n); }).length;
+    $('sum').innerHTML = '오늘(' + md(today) + ') 기준 노출 <b>' + on + '곳</b> · 오늘 온라인광고를 처음 켠 센터는 <b>' + md(addDays(today, n - 1)) + '</b>까지 보이고 <b>' + md(addDays(today, n)) + '</b>에 빠집니다.' +
+      (on === 0 ? '<br>지금 노출할 센터가 없어 앱 홈에서 이 칸은 숨겨집니다.' : '');
+    $('rows').innerHTML = list.map(function (c) {
+      var s = state(c, n);
+      return '<tr data-id="' + c.centerId + '"><td class="nm">' + esc(c.centerName) + '</td>' +
+        '<td>' + adCell(c) + '</td>' +
+        '<td>' + (c.adStartDate ? '<input type="date" class="jd" value="' + c.adStartDate + '">' : '<span class="hint">—</span>') + '</td>' +
+        '<td><span class="st ' + s.cls + '">' + s.text + '</span></td>' +
+        '<td><button type="button" class="adtoggle">' + (c.adOn ? '광고 끄기' : '광고 켜기') + '</button></td></tr>';
+    }).join('');
+  }
+
+  function patch(id, v) {
+    var all = AdminMock.load(); all.centers = all.centers || {};
+    var cur = all.centers[id] || {};
+    for (var k in v) cur[k] = v[k];
+    all.centers[id] = cur; AdminMock.save(all);
+  }
+
+  $('save').addEventListener('click', function () {
+    var v = $('days').value.trim(), n = Number(v);
+    if (!Number.isInteger(n) || n < HomeReco.NEW_DAYS_MIN || n > HomeReco.NEW_DAYS_MAX) {
+      $('msg').className = 'err'; $('msg').textContent = '1~365 사이 숫자로 입력해 주세요'; return;
+    }
+    var all = AdminMock.load(); all.newDays = n; AdminMock.save(all);
+    render();
+    $('msg').className = 'ok'; $('msg').textContent = '저장했어요 · 앱 홈에 바로 반영됩니다';
+  });
+  // 켜기: 시작일이 없을 때만 오늘로 기록(첫 시작일 고정). 끄기: 시작일은 남긴다
+  $('rows').addEventListener('click', function (e) {
+    var b = e.target.closest('.adtoggle'); if (!b) return;
+    var id = b.closest('tr').dataset.id;
+    var c = AdminMock.applyCenters(base).filter(function (x) { return String(x.centerId) === id; })[0];
+    patch(id, c.adOn ? { adOn: false, visible: false } : { adOn: true, visible: true, adStartDate: c.adStartDate || today });
+    render();
+  });
+  $('rows').addEventListener('change', function (e) {
+    if (!e.target.classList.contains('jd') || !e.target.value) return;
+    patch(e.target.closest('tr').dataset.id, { adStartDate: e.target.value });
+    render();
+  });
+  $('reset').addEventListener('click', function (e) { e.preventDefault(); AdminMock.reset(); $('msg').textContent = ''; render(); });
+  $('toHome').href = 'home.html?today=' + encodeURIComponent(today);
+  render();
+})();
+</script>
+</body></html>
